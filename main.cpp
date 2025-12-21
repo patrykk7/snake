@@ -1,4 +1,7 @@
+#include <charconv>
 #include <deque>
+#include <string>
+
 #include "raylib.h"
 #include "raymath.h"
 
@@ -8,6 +11,9 @@ Color darkGreen = {43, 51, 24, 255};
 float cellSize = 30;
 int cellCount = 20;
 
+bool running = true;
+
+int points = 0;
 double lastUpdate = 0;
 
 bool ElementInDeque(Vector2 element, std::deque<Vector2> deque) {
@@ -37,13 +43,13 @@ class Snake {
             DrawRectangleRounded(segment,0.5,6,darkGreen);
         }
     }
+
     void Update() {
         body.push_front(Vector2Add(body[0],direction));
         if (!addSegment) body.pop_back();
         else addSegment = false;
-
-
     }
+
     void Move() {
         if (IsKeyDown(KEY_UP) and direction.y != 1) direction = {0,-1};
         if (IsKeyDown(KEY_DOWN) and direction.y != -1) direction = {0,1};
@@ -56,6 +62,12 @@ class Snake {
     }
 
     void addLength() {addSegment = true;}
+
+    void Reset() {
+        addSegment = false;
+        body = {Vector2{6,9}, Vector2{5,9}, Vector2{4,9}};
+        direction = {1,0};
+    }
 };
 
 class Food {
@@ -111,13 +123,48 @@ class Game {
         snake.Draw();
     }
     void Update() {
-        snake.Update();
-        Eat();
+        if (running) {
+            snake.Update();
+            checkCollision();
+            Eat();
+        }
     }
     void Eat () {
         if (Vector2Equals(snake.getBody()[0],food.getPosition())) {
             food.setPosition(food.randPosition(snake.getBody()));
             snake.addLength();
+            points++;
+        }
+    }
+
+    void gameOver() {
+        snake.Reset();
+        food.setPosition(food.randPosition(snake.getBody()));
+        running = false;
+    }
+
+    void DrawEnding() {
+        const char *text = std::to_string(points).c_str();
+        ClearBackground(green);
+        DrawText("YOU LOST",172,cellCount*cellSize/2 - 50,50,WHITE);
+        DrawText("press spacebar to continue",120,cellCount*cellSize/2,25,WHITE);
+        DrawText("score: ",120,cellCount*cellSize/2 + 30,25,WHITE);
+        DrawText(text,200,cellCount*cellSize/2 + 30,25,WHITE);
+        if (IsKeyDown(KEY_SPACE)) running = true;
+    }
+
+    void checkCollision() {
+        std::deque<Vector2> body = snake.getBody();
+        int snake_x = body.front().x;
+        int snake_y = body.front().y;
+        if (snake_x < 0 or snake_x >= cellCount) {
+            gameOver();
+        }
+        if (snake_y < 0 or snake_y >= cellCount) {
+            gameOver();
+        }
+        for (int i = 1; i < body.size(); i++) {
+            if (snake_x == body[i].x && snake_y == body[i].y) gameOver();
         }
     }
 };
@@ -132,7 +179,8 @@ int main() {
         game.snake.Move();
         if (eventTriggered(0.2)) game.Update();
         ClearBackground(green);
-        game.Draw();
+        if (running) game.Draw();
+        else game.DrawEnding();
         EndDrawing();
     }
 
