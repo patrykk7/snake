@@ -1,7 +1,4 @@
-#include <charconv>
 #include <deque>
-#include <string>
-
 #include "raylib.h"
 #include "raymath.h"
 
@@ -10,13 +7,14 @@ Color darkGreen = {43, 51, 24, 255};
 
 float cellSize = 30;
 int cellCount = 20;
+int  offset = 75;
 
 bool running = true;
 
 int points = 0;
 double lastUpdate = 0;
 
-bool ElementInDeque(Vector2 element, std::deque<Vector2> deque) {
+bool ElementInDeque(Vector2 element, const std::deque<Vector2>& deque) {
     for (unsigned int i = 0; i < deque.size(); i++) {
         if (Vector2Equals(deque[i], element)) return true;
     }
@@ -34,27 +32,32 @@ bool eventTriggered (double interval) {
 
 class Snake {
     Vector2 direction = {1,0};
+    Vector2 runningDirection = {1,0};
     bool addSegment = false;
     std::deque<Vector2> body = {Vector2{6,9}, Vector2{5,9}, Vector2{4,9}};
     public:
+    Snake() = default;
+    ~Snake() = default;
+
     void Draw() {
         for (int i = 0; i < body.size(); i++) {
-            Rectangle segment = Rectangle{body[i].x*cellSize,body[i].y*cellSize,cellSize, cellSize};
+            Rectangle segment = Rectangle{offset+body[i].x*cellSize,offset+body[i].y*cellSize,cellSize, cellSize};
             DrawRectangleRounded(segment,0.5,6,darkGreen);
         }
     }
 
     void Update() {
         body.push_front(Vector2Add(body[0],direction));
+        runningDirection = direction;
         if (!addSegment) body.pop_back();
         else addSegment = false;
     }
 
     void Move() {
-        if (IsKeyDown(KEY_UP) and direction.y != 1) direction = {0,-1};
-        if (IsKeyDown(KEY_DOWN) and direction.y != -1) direction = {0,1};
-        if (IsKeyDown(KEY_LEFT) and direction.x != 1) direction = {-1,0};
-        if (IsKeyDown(KEY_RIGHT) and direction.x != -1) direction = {1,0};
+        if (IsKeyDown(KEY_UP) and runningDirection.y != 1) direction = {0,-1};
+        if (IsKeyDown(KEY_DOWN) and runningDirection.y != -1) direction = {0,1};
+        if (IsKeyDown(KEY_LEFT) and runningDirection.x != 1) direction = {-1,0};
+        if (IsKeyDown(KEY_RIGHT) and runningDirection.x != -1) direction = {1,0};
     }
 
     std::deque<Vector2> getBody () {
@@ -67,6 +70,7 @@ class Snake {
         addSegment = false;
         body = {Vector2{6,9}, Vector2{5,9}, Vector2{4,9}};
         direction = {1,0};
+        runningDirection = {1,0};
     }
 };
 
@@ -75,7 +79,7 @@ class Food {
     Texture2D texture;
 
     public:
-        Food(std::deque<Vector2> body) {
+        Food(const std::deque<Vector2> &body) {
             Image image = LoadImage("apple.png");
             ImageResize(&image, cellSize, cellSize);
             texture = LoadTextureFromImage(image);
@@ -88,7 +92,7 @@ class Food {
         }
 
         void Draw() {
-            DrawTexture(texture, position.x*cellSize, position.y*cellSize, WHITE);
+            DrawTexture(texture, offset+position.x*cellSize, offset+position.y*cellSize, WHITE);
         }
 
         Vector2 genRandomCell() {
@@ -97,7 +101,7 @@ class Food {
             return Vector2{x,y};
         }
 
-        Vector2 randPosition(std::deque<Vector2> snakeBody) {
+        Vector2 randPosition(const std::deque<Vector2> &snakeBody) {
             Vector2 position = genRandomCell();
             while (ElementInDeque(position, snakeBody)) {
                 position = genRandomCell();
@@ -118,6 +122,19 @@ class Game {
     public:
     Snake snake;
     Food food = Food(snake.getBody());
+    Sound eatApple;
+    Sound hitWall;
+
+    Game () {
+        InitAudioDevice();
+        eatApple = LoadSound("apple.mp3");
+        hitWall = LoadSound("wall.mp3");
+    }
+    ~Game() {
+        UnloadSound(eatApple);
+        UnloadSound(hitWall);
+        CloseAudioDevice();
+    }
     void Draw() {
         food.Draw();
         snake.Draw();
@@ -133,6 +150,7 @@ class Game {
         if (Vector2Equals(snake.getBody()[0],food.getPosition())) {
             food.setPosition(food.randPosition(snake.getBody()));
             snake.addLength();
+            PlaySound(eatApple);
             points++;
         }
     }
@@ -143,14 +161,31 @@ class Game {
         running = false;
     }
 
-    void DrawEnding() {
-        const char *text = std::to_string(points).c_str();
+    void DrawEnding(int screenWidth) {
+
         ClearBackground(green);
-        DrawText("YOU LOST",172,cellCount*cellSize/2 - 50,50,WHITE);
-        DrawText("press spacebar to continue",120,cellCount*cellSize/2,25,WHITE);
-        DrawText("score: ",120,cellCount*cellSize/2 + 30,25,WHITE);
-        DrawText(text,200,cellCount*cellSize/2 + 30,25,WHITE);
-        if (IsKeyDown(KEY_SPACE)) running = true;
+
+        const char* text1 = "YOU LOST";
+        int fontSize1 = 50;
+        int textWidth1 = MeasureText(text1, fontSize1);
+        int posX1 = (screenWidth / 2) - (textWidth1 / 2);
+        DrawText(text1,posX1,screenWidth/2 - 50,fontSize1,darkGreen);
+
+        const char* text2 = "press spacebar to continue";
+        int fontSize2 = 25;
+        int textWidth2 = MeasureText(text2, fontSize2);
+        int posX2 = (screenWidth / 2) - (textWidth2 / 2);
+        DrawText(text2,posX2,screenWidth/2,fontSize2,darkGreen);
+
+        const char* scoreText = TextFormat("score: %i", points);
+        int textWidth3 = MeasureText(scoreText,fontSize2);
+        int posX3 = (screenWidth / 2) - (textWidth3 / 2);
+        DrawText(scoreText,posX3,screenWidth/2 + 30,fontSize2,darkGreen);
+
+        if (IsKeyDown(KEY_SPACE)) {
+            running = true;
+            points = 0;
+        }
     }
 
     void checkCollision() {
@@ -158,19 +193,28 @@ class Game {
         int snake_x = body.front().x;
         int snake_y = body.front().y;
         if (snake_x < 0 or snake_x >= cellCount) {
+            PlaySound(hitWall);
+            WaitTime(0.2);
             gameOver();
         }
         if (snake_y < 0 or snake_y >= cellCount) {
+            PlaySound(hitWall);
+            WaitTime(0.2);
             gameOver();
         }
         for (int i = 1; i < body.size(); i++) {
-            if (snake_x == body[i].x && snake_y == body[i].y) gameOver();
+            if (snake_x == body[i].x && snake_y == body[i].y) {
+                PlaySound(hitWall);
+                WaitTime(0.2);
+                gameOver();
+            }
         }
     }
 };
 
 int main() {
-    InitWindow(cellSize*cellCount, cellSize*cellCount, "Snake");
+    int screenWidth = 2*offset+cellSize*cellCount;
+    InitWindow(screenWidth, screenWidth, "Snake");
     SetTargetFPS(120);
     Game game;
 
@@ -179,11 +223,21 @@ int main() {
         game.snake.Move();
         if (eventTriggered(0.2)) game.Update();
         ClearBackground(green);
-        if (running) game.Draw();
-        else game.DrawEnding();
+        if (running) {
+            const char *score = TextFormat("%i", points);
+            int fontSize = 40;
+            int textWidth = MeasureText(score, fontSize);
+            int posX = screenWidth - offset - textWidth + 5;
+            DrawRectangleLinesEx(Rectangle{(float) offset - 5, (float) offset - 5, cellCount * cellSize + 10,
+                cellCount * cellSize + 10}, 5, darkGreen);
+            DrawText("Snake Game", offset - 5, 20, fontSize, darkGreen);
+            DrawText(TextFormat("%i", points), posX, 20, fontSize, darkGreen);
+            game.Draw();
+        } else game.DrawEnding(screenWidth);
         EndDrawing();
     }
 
     CloseWindow();
+
     return 0;
 }
