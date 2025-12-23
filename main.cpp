@@ -4,30 +4,64 @@
 
 Color green = {173, 204, 96, 255};
 Color darkGreen = {43, 51, 24, 255};
+Color pulsating_white = {255, 25, 50, 255};
 
 float cellSize = 30;
 int cellCount = 20;
 int  offset = 75;
 
 bool running = true;
+bool isPaused = false;
+bool isFading = false;
 
 int points = 0;
 double lastUpdate = 0;
+double lastPause = 0;
 
-bool ElementInDeque(Vector2 element, const std::deque<Vector2>& deque) {
+bool elementInDeque(Vector2 element, const std::deque<Vector2>& deque) {
     for (unsigned int i = 0; i < deque.size(); i++) {
         if (Vector2Equals(deque[i], element)) return true;
     }
     return false;
 }
 
-bool eventTriggered (double interval) {
+bool eventTriggered (double interval, double &lastUpdate) {
     double currentTime = GetTime();
     if (currentTime - lastUpdate >= interval) {
         lastUpdate = currentTime;
         return true;
     }
     return false;
+}
+
+
+void drawPause(int screenWidth) {
+    const char* scoreText = TextFormat("GAME PAUSED");
+    int fontSize = 100;
+    int textWidth = MeasureText(scoreText,fontSize);
+    int posX = (screenWidth / 2) - (textWidth / 2);
+    DrawText(scoreText,posX,screenWidth/2 - fontSize/2,fontSize,pulsating_white);
+    if (pulsating_white.a == 255) isFading = true;
+    else if (pulsating_white.a < 150) isFading = false;
+    if (eventTriggered(0.05,lastUpdate)) {
+        if (pulsating_white.a > 0 and isFading) pulsating_white.a -= 10;
+        else pulsating_white.a += 10;
+    }
+}
+
+void drawPoints(int screenWidth) {
+    const char *score = TextFormat("%i", points);
+    const char *spacebar = "press spacebar to pause/unpause";
+    int fontSize = 40;
+    int fontSize2 = 20;
+    int textWidth = MeasureText(score, fontSize);
+    int textWidth2 = MeasureText(spacebar, fontSize2);
+    int posX = screenWidth - offset - textWidth + 5;
+    DrawRectangleLinesEx(Rectangle{(float) offset - 5, (float) offset - 5, cellCount * cellSize + 10,
+        cellCount * cellSize + 10}, 5, darkGreen);
+    DrawText("Snake Game", offset - 5, 20, fontSize, darkGreen);
+    DrawText(TextFormat("%i", points), posX, 20, fontSize, darkGreen);
+    DrawText(spacebar,screenWidth/2 - textWidth2/2,screenWidth - offset + fontSize2/2,fontSize2, darkGreen);
 }
 
 class Snake {
@@ -39,21 +73,21 @@ class Snake {
     Snake() = default;
     ~Snake() = default;
 
-    void Draw() {
+    void draw() {
         for (int i = 0; i < body.size(); i++) {
             Rectangle segment = Rectangle{offset+body[i].x*cellSize,offset+body[i].y*cellSize,cellSize, cellSize};
             DrawRectangleRounded(segment,0.5,6,darkGreen);
         }
     }
 
-    void Update() {
+    void update() {
         body.push_front(Vector2Add(body[0],direction));
         runningDirection = direction;
         if (!addSegment) body.pop_back();
         else addSegment = false;
     }
 
-    void Move() {
+    void move() {
         if (IsKeyDown(KEY_UP) and runningDirection.y != 1) direction = {0,-1};
         if (IsKeyDown(KEY_DOWN) and runningDirection.y != -1) direction = {0,1};
         if (IsKeyDown(KEY_LEFT) and runningDirection.x != 1) direction = {-1,0};
@@ -66,7 +100,7 @@ class Snake {
 
     void addLength() {addSegment = true;}
 
-    void Reset() {
+    void reset() {
         addSegment = false;
         body = {Vector2{6,9}, Vector2{5,9}, Vector2{4,9}};
         direction = {1,0};
@@ -91,7 +125,7 @@ class Food {
             UnloadTexture(texture);
         }
 
-        void Draw() {
+        void draw() {
             DrawTexture(texture, offset+position.x*cellSize, offset+position.y*cellSize, WHITE);
         }
 
@@ -103,7 +137,7 @@ class Food {
 
         Vector2 randPosition(const std::deque<Vector2> &snakeBody) {
             Vector2 position = genRandomCell();
-            while (ElementInDeque(position, snakeBody)) {
+            while (elementInDeque(position, snakeBody)) {
                 position = genRandomCell();
             }
             return position;
@@ -135,18 +169,18 @@ class Game {
         UnloadSound(hitWall);
         CloseAudioDevice();
     }
-    void Draw() {
-        food.Draw();
-        snake.Draw();
+    void draw() {
+        food.draw();
+        snake.draw();
     }
-    void Update() {
+    void update() {
         if (running) {
-            snake.Update();
+            snake.update();
             checkCollision();
-            Eat();
+            eat();
         }
     }
-    void Eat () {
+    void eat () {
         if (Vector2Equals(snake.getBody()[0],food.getPosition())) {
             food.setPosition(food.randPosition(snake.getBody()));
             snake.addLength();
@@ -156,12 +190,12 @@ class Game {
     }
 
     void gameOver() {
-        snake.Reset();
+        snake.reset();
         food.setPosition(food.randPosition(snake.getBody()));
         running = false;
     }
 
-    void DrawEnding(int screenWidth) {
+    void drawEnding(int screenWidth) {
 
         ClearBackground(green);
 
@@ -220,20 +254,22 @@ int main() {
 
     while (!WindowShouldClose()) {
         BeginDrawing();
-        game.snake.Move();
-        if (eventTriggered(0.2)) game.Update();
+
+        if (IsKeyPressed(KEY_SPACE) and running and eventTriggered(0.5,lastPause)) {
+            isPaused = !isPaused;
+        }
+        if (!isPaused) {
+            game.snake.move();
+            if (eventTriggered(0.2,lastUpdate)) game.update();
+        }
+
         ClearBackground(green);
         if (running) {
-            const char *score = TextFormat("%i", points);
-            int fontSize = 40;
-            int textWidth = MeasureText(score, fontSize);
-            int posX = screenWidth - offset - textWidth + 5;
-            DrawRectangleLinesEx(Rectangle{(float) offset - 5, (float) offset - 5, cellCount * cellSize + 10,
-                cellCount * cellSize + 10}, 5, darkGreen);
-            DrawText("Snake Game", offset - 5, 20, fontSize, darkGreen);
-            DrawText(TextFormat("%i", points), posX, 20, fontSize, darkGreen);
-            game.Draw();
-        } else game.DrawEnding(screenWidth);
+            drawPoints(screenWidth);
+            game.draw();
+            if (isPaused) drawPause(screenWidth);
+        } else game.drawEnding(screenWidth);
+
         EndDrawing();
     }
 
