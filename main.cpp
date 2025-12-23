@@ -4,19 +4,21 @@
 
 Color green = {173, 204, 96, 255};
 Color darkGreen = {43, 51, 24, 255};
-Color pulsating_white = {255, 25, 50, 255};
+Color pulsating;
+
+double lastUpdate = 0;
+double lastPause = 0;
+double lastAnimation = 0;
 
 float cellSize = 30;
-int cellCount = 20;
-int  offset = 75;
 
+int cellCount = 20;
+int offset = 75;
+int spawned;
+int points = 0;
 bool running = true;
 bool isPaused = false;
 bool isFading = false;
-
-int points = 0;
-double lastUpdate = 0;
-double lastPause = 0;
 
 bool elementInDeque(Vector2 element, const std::deque<Vector2>& deque) {
     for (unsigned int i = 0; i < deque.size(); i++) {
@@ -34,18 +36,27 @@ bool eventTriggered (double interval, double &lastUpdate) {
     return false;
 }
 
+void chooseColor() {
+    if (spawned == 0) pulsating = {221, 21, 51, 255};
+    else if (spawned == 1) pulsating = {254, 254, 51, 255};
+    else if (spawned == 2) pulsating = {79, 134, 247, 255};
+    else if (spawned == 3) pulsating = {111, 45, 168, 255};
+    else if (spawned == 4) pulsating = {156, 239, 67, 255};
+    else if (spawned == 5) pulsating = {255, 165, 0, 255};
+}
 
 void drawPause(int screenWidth) {
     const char* scoreText = TextFormat("GAME PAUSED");
     int fontSize = 100;
     int textWidth = MeasureText(scoreText,fontSize);
     int posX = (screenWidth / 2) - (textWidth / 2);
-    DrawText(scoreText,posX,screenWidth/2 - fontSize/2,fontSize,pulsating_white);
-    if (pulsating_white.a == 255) isFading = true;
-    else if (pulsating_white.a < 150) isFading = false;
-    if (eventTriggered(0.05,lastUpdate)) {
-        if (pulsating_white.a > 0 and isFading) pulsating_white.a -= 10;
-        else pulsating_white.a += 10;
+
+    DrawText(scoreText,posX,screenWidth/2 - fontSize/2,fontSize,pulsating);
+    if (pulsating.a == 255) isFading = true;
+    else if (pulsating.a < 150) isFading = false;
+    if (eventTriggered(0.05,lastAnimation)) {
+        if (pulsating.a > 0 and isFading) pulsating.a -= 10;
+        else pulsating.a += 10;
     }
 }
 
@@ -113,8 +124,8 @@ class Food {
     Texture2D texture;
 
     public:
-        Food(const std::deque<Vector2> &body) {
-            Image image = LoadImage("apple.png");
+        Food(const std::deque<Vector2> &body, const char* path) {
+            Image image = LoadImage(path);
             ImageResize(&image, cellSize, cellSize);
             texture = LoadTextureFromImage(image);
             UnloadImage(image);
@@ -152,10 +163,52 @@ class Food {
         }
 };
 
+class Apple : public Food {
+    public:
+    Apple(const std::deque<Vector2> &body, const char *path = "apple.png") : Food(body, path) {}
+    ~Apple() = default;
+};
+
+class Grape : public Food {
+    public:
+    Grape(const std::deque<Vector2> &body, const char *path = "grape.png"): Food(body, path) {}
+    ~Grape() = default;
+};
+
+class Banana : public Food {
+    public:
+    Banana(const std::deque<Vector2> &body, const char *path = "banana.png"): Food(body, path) {}
+    ~Banana() = default;
+};
+
+class Blueberry : public Food {
+public:
+    Blueberry(const std::deque<Vector2> &body, const char *path = "blueberry.png"): Food(body, path) {}
+    ~Blueberry() = default;
+};
+
+class Kiwi : public Food {
+    public:
+    Kiwi(const std::deque<Vector2> &body, const char *path = "kiwi.png"): Food(body, path) {}
+    ~Kiwi() = default;
+};
+
+class Orange : public Food {
+public:
+    Orange(const std::deque<Vector2> &body, const char *path = "orange.png"): Food(body, path) {}
+    ~Orange() = default;
+};
+
 class Game {
     public:
     Snake snake;
-    Food food = Food(snake.getBody());
+    Apple apple = Apple(snake.getBody());
+    Banana banana = Banana(snake.getBody());
+    Blueberry blueberry = Blueberry(snake.getBody());
+    Orange orange = Orange(snake.getBody());
+    Kiwi kiwi = Kiwi(snake.getBody());
+    Grape grape = Grape(snake.getBody());
+    Food* food [6] = {&apple, &banana,&blueberry,&grape,&kiwi,&orange};
     Sound eatApple;
     Sound hitWall;
 
@@ -163,16 +216,20 @@ class Game {
         InitAudioDevice();
         eatApple = LoadSound("apple.mp3");
         hitWall = LoadSound("wall.mp3");
+        spawned = GetRandomValue(0,5);
+        chooseColor();
     }
     ~Game() {
         UnloadSound(eatApple);
         UnloadSound(hitWall);
         CloseAudioDevice();
     }
+
     void draw() {
-        food.draw();
+        food[spawned]->draw();
         snake.draw();
     }
+
     void update() {
         if (running) {
             snake.update();
@@ -180,9 +237,12 @@ class Game {
             eat();
         }
     }
+
     void eat () {
-        if (Vector2Equals(snake.getBody()[0],food.getPosition())) {
-            food.setPosition(food.randPosition(snake.getBody()));
+        if (Vector2Equals(snake.getBody()[0],food[spawned]->getPosition())) {
+            spawned = GetRandomValue(0,5);
+            chooseColor();
+            food[spawned]->setPosition(food[spawned]->randPosition(snake.getBody()));
             snake.addLength();
             PlaySound(eatApple);
             points++;
@@ -191,7 +251,9 @@ class Game {
 
     void gameOver() {
         snake.reset();
-        food.setPosition(food.randPosition(snake.getBody()));
+        spawned = GetRandomValue(0, 5);
+        chooseColor();
+        food[spawned]->setPosition(food[spawned]->randPosition(snake.getBody()));
         running = false;
     }
 
