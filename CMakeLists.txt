@@ -12,3 +12,9 @@ FetchContent_MakeAvailable(raylib)
 add_executable(snake main.cpp)
 
 target_link_libraries(snake PRIVATE raylib)
+
+add_custom_command(TARGET snake POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E copy_directory
+        ${CMAKE_SOURCE_DIR}/assets
+        ${CMAKE_BINARY_DIR}/assets
+)

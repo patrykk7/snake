@@ -165,42 +165,43 @@ class Food {
 
 class Apple : public Food {
     public:
-    Apple(const std::deque<Vector2> &body, const char *path = "apple.png") : Food(body, path) {}
+    Apple(const std::deque<Vector2> &body, const char *path = "assets/apple.png") : Food(body, path) {}
     ~Apple() = default;
 };
 
 class Grape : public Food {
     public:
-    Grape(const std::deque<Vector2> &body, const char *path = "grape.png"): Food(body, path) {}
+    Grape(const std::deque<Vector2> &body, const char *path = "assets/grape.png"): Food(body, path) {}
     ~Grape() = default;
 };
 
 class Banana : public Food {
     public:
-    Banana(const std::deque<Vector2> &body, const char *path = "banana.png"): Food(body, path) {}
+    Banana(const std::deque<Vector2> &body, const char *path = "assets/banana.png"): Food(body, path) {}
     ~Banana() = default;
 };
 
 class Blueberry : public Food {
 public:
-    Blueberry(const std::deque<Vector2> &body, const char *path = "blueberry.png"): Food(body, path) {}
+    Blueberry(const std::deque<Vector2> &body, const char *path = "assets/blueberry.png"): Food(body, path) {}
     ~Blueberry() = default;
 };
 
 class Kiwi : public Food {
     public:
-    Kiwi(const std::deque<Vector2> &body, const char *path = "kiwi.png"): Food(body, path) {}
+    Kiwi(const std::deque<Vector2> &body, const char *path = "assets/kiwi.png"): Food(body, path) {}
     ~Kiwi() = default;
 };
 
 class Orange : public Food {
 public:
-    Orange(const std::deque<Vector2> &body, const char *path = "orange.png"): Food(body, path) {}
+    Orange(const std::deque<Vector2> &body, const char *path = "assets/orange.png"): Food(body, path) {}
     ~Orange() = default;
 };
 
 class Game {
     public:
+    bool gameWon = false;
     Snake snake;
     Apple apple = Apple(snake.getBody());
     Banana banana = Banana(snake.getBody());
@@ -214,8 +215,8 @@ class Game {
 
     Game () {
         InitAudioDevice();
-        eatApple = LoadSound("apple.mp3");
-        hitWall = LoadSound("wall.mp3");
+        eatApple = LoadSound("assets/apple.mp3");
+        hitWall = LoadSound("assets/wall.mp3");
         spawned = GetRandomValue(0,5);
         chooseColor();
     }
